@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice Generator</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin: 20px; background: #f8f8f8; }
+        .container { max-width: 350px; margin: auto; background: white; padding: 15px; border-radius: 5px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
+
+        /* Form Styling */
+        .form-group { display: flex; flex-direction: column; margin-bottom: 8px; text-align: left; }
+        input, button { padding: 6px; font-size: 14px; width: 100%; }
+        button { cursor: pointer; background: #007bff; color: white; border: none; border-radius: 5px; }
+        button:hover { background: #0056b3; }
+
+        /* Invoice Styling (Optimized for Small Bluetooth Printers) */
+        .invoice {
+            display: none;
+            width: 240px; /* Small receipt width */
+            padding: 10px;
+            margin: auto;
+            background: white;
+            font-size: 12px;
+            border: 1px dashed black;
+        }
+        .invoice-header { text-align: center; border-bottom: 1px dashed black; padding-bottom: 5px; margin-bottom: 5px; }
+        .invoice-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .invoice-table th, .invoice-table td { padding: 4px; text-align: left; border-bottom: 1px dashed black; }
+        .total-row { font-weight: bold; }
+        .print-btn { margin-top: 10px; }
+
+        /* Print Styles for Small Bluetooth Printers */
+        @media print {
+            body * { visibility: hidden; }
+            .invoice, .invoice * { visibility: visible; }
+            .invoice { position: absolute; left: 0; top: 0; width: 100%; height: auto; }
+            .print-btn { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>Invoice Generator</h2>
+
+        <div class="form-group">
+            <label>Customer Name:</label>
+            <input type="text" id="customerName" required>
+        </div>
+
+        <div class="form-group">
+            <label>Customer Mobile:</label>
+            <input type="text" id="customerMobile" required pattern="[0-9]{10}" maxlength="10" placeholder="Enter 10-digit mobile number">
+        </div>
+
+        <h3>Items</h3>
+        <table id="itemsTable" class="invoice-table">
+            <tr>
+                <th>Item</th>
+                <th>₹</th>
+                <th>Qty</th>
+                <th>Action</th>
+            </tr>
+        </table>
+
+        <div class="form-group">
+            <label>Item Name:</label>
+            <input type="text" id="itemName">
+        </div>
+
+        <div class="form-group">
+            <label>Price:</label>
+            <input type="number" id="price">
+        </div>
+
+        <div class="form-group">
+            <label>Quantity:</label>
+            <input type="number" id="quantity">
+        </div>
+
+        <button type="button" onclick="addItem()">Add Item</button>
+        <button type="button" onclick="generateInvoice()">Generate Invoice</button>
+
+        <div class="invoice" id="invoice">
+            <div class="invoice-header">
+                <h2>Jalaram Clothes</h2>
+                <p>Date: <span id="invoiceDate"></span></p>
+            </div>
+            <p><strong>Customer:</strong> <span id="cName"></span></p>
+            <p><strong>Mobile:</strong> <span id="cMobile"></span></p>
+            <table class="invoice-table">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>₹</th>
+                        <th>Qty</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody id="invoiceItems"></tbody>
+                <tfoot>
+                    <tr class="total-row">
+                        <td colspan="3"><strong>Grand Total</strong></td>
+                        <td>₹<span id="grandTotal">0</span></td>
+                    </tr>
+                </tfoot>
+            </table>
+            <p>Thank you for your purchase!</p>
+            <button class="print-btn" onclick="window.print()">Print Invoice</button>
+        </div>
+    </div>
+
+    <script>
+        let items = [];
+
+        function addItem() {
+            let itemName = document.getElementById("itemName").value;
+            let price = parseFloat(document.getElementById("price").value);
+            let quantity = parseInt(document.getElementById("quantity").value);
+
+            if (itemName && price > 0 && quantity > 0) {
+                items.push({ name: itemName, price, quantity });
+                updateItemsTable();
+                document.getElementById("itemName").value = "";
+                document.getElementById("price").value = "";
+                document.getElementById("quantity").value = "";
+            } else {
+                alert("Please enter valid item details!");
+            }
+        }
+
+        function removeItem(index) {
+            items.splice(index, 1);
+            updateItemsTable();
+        }
+
+        function updateItemsTable() {
+            let table = document.getElementById("itemsTable");
+            table.innerHTML = `
+                <tr>
+                    <th>Item</th>
+                    <th>₹</th>
+                    <th>Qty</th>
+                    <th>Action</th>
+                </tr>
+            `;
+            items.forEach((item, index) => {
+                let row = table.insertRow();
+                row.innerHTML = `
+                    <td>${item.name}</td>
+                    <td>₹${item.price}</td>
+                    <td>${item.quantity}</td>
+                    <td><button onclick="removeItem(${index})">Remove</button></td>
+                `;
+            });
+        }
+
+        function generateInvoice() {
+            let customerName = document.getElementById("customerName").value;
+            let customerMobile = document.getElementById("customerMobile").value;
+
+            if (!customerName || !customerMobile || items.length === 0) {
+                alert("Please enter customer details and add at least one item.");
+                return;
+            }
+
+            let today = new Date().toLocaleDateString();
+            document.getElementById("invoiceDate").innerText = today;
+            document.getElementById("cName").innerText = customerName;
+            document.getElementById("cMobile").innerText = customerMobile;
+
+            let invoiceBody = document.getElementById("invoiceItems");
+            invoiceBody.innerHTML = "";
+            let grandTotal = 0;
+
+            items.forEach(item => {
+                let total = item.price * item.quantity;
+                grandTotal += total;
+
+                let row = document.createElement("tr");
+                row.innerHTML = `
+                    <td>${item.name}</td>
+                    <td>₹${item.price}</td>
+                    <td>${item.quantity}</td>
+                    <td>₹${total}</td>
+                `;
+                invoiceBody.appendChild(row);
+            });
+
+            document.getElementById("grandTotal").innerText = grandTotal;
+            document.getElementById("invoice").style.display = "block";
+        }
+    </script>
+
+</body>
+</html>
