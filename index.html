@@ -3,41 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
     <title>Invoice Generator</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; margin: 20px; background: #f8f8f8; }
-        .container { max-width: 350px; margin: auto; background: white; padding: 15px; border-radius: 5px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
-
-        /* Form Styling */
+        body { font-family: Arial, sans-serif; text-align: center; background: #f8f8f8; padding: 10px; }
+        .container { max-width: 350px; margin: auto; background: white; padding: 10px; border-radius: 5px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
         .form-group { display: flex; flex-direction: column; margin-bottom: 8px; text-align: left; }
-        input, button { padding: 6px; font-size: 14px; width: 100%; }
-        button { cursor: pointer; background: #007bff; color: white; border: none; border-radius: 5px; }
+        select, input, button { padding: 6px; font-size: 14px; width: 100%; }
+        button { cursor: pointer; background: #007bff; color: white; border: none; border-radius: 5px; margin-top: 5px; padding: 8px; }
         button:hover { background: #0056b3; }
-
-        /* Invoice Styling (Optimized for Small Bluetooth Printers) */
-        .invoice {
-            display: none;
-            width: 240px; /* Small receipt width */
-            padding: 10px;
-            margin: auto;
-            background: white;
-            font-size: 12px;
-            border: 1px dashed black;
-        }
+        .invoice { display: none; width: 240px; padding: 10px; margin: auto; background: white; font-size: 12px; border: 1px dashed black; }
         .invoice-header { text-align: center; border-bottom: 1px dashed black; padding-bottom: 5px; margin-bottom: 5px; }
         .invoice-table { width: 100%; border-collapse: collapse; font-size: 12px; }
         .invoice-table th, .invoice-table td { padding: 4px; text-align: left; border-bottom: 1px dashed black; }
         .total-row { font-weight: bold; }
-        .print-btn { margin-top: 10px; }
+        #billNumberContainer {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+    }
 
-        /* Print Styles for Small Bluetooth Printers */
+    @media print {
+        #billNumberContainer {
+            position: absolute;
+            top: 0px;
+            left: 10px;
+            
+        }
+    }
+
         @media print {
             body * { visibility: hidden; }
             .invoice, .invoice * { visibility: visible; }
-            .invoice { position: absolute; left: 0; top: 0; width: 100%; height: auto; }
+            .invoice { position: absolute; left: 0; top: 0;  width: 96%;  }
             .print-btn { display: none; }
         }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://www.dropbox.com/static/api/2/dropins.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dropbox.js/10.34.0/Dropbox-sdk.min.js"></script>
+
+
+
+
 </head>
 <body>
 
@@ -63,29 +72,39 @@
                 <th>Action</th>
             </tr>
         </table>
-
+<div id="dropbox-button">
         <div class="form-group">
-            <label>Item Name:</label>
-            <input type="text" id="itemName">
+            <label>Select Product:</label>
+            <select id="productSelect" onchange="updatePrice()">
+                <option value="" disabled selected>Select an item</option>
+            </select>
         </div>
 
         <div class="form-group">
             <label>Price:</label>
-            <input type="number" id="price">
+            <input type="number" id="price" readonly>
         </div>
 
         <div class="form-group">
             <label>Quantity:</label>
-            <input type="number" id="quantity">
+            <input type="number" id="quantity" value="1">
         </div>
-
+</div>
         <button type="button" onclick="addItem()">Add Item</button>
         <button type="button" onclick="generateInvoice()">Generate Invoice</button>
 
         <div class="invoice" id="invoice">
             <div class="invoice-header">
+                
+
                 <h2>Jalaram Clothes</h2>
-                <p>Date: <span id="invoiceDate"></span></p>
+                <p>G-21 Sumeru City Mall,Near Sudama <br> Chowk Opp. Krishna Township, Mota <br> Varachha,Surat <br>
+                    8320827878 <br> </p>
+              <p> Date: <span id="invoiceDate"></span></p>
+                <div id="billNumberContainer">
+    <p><strong>Bill No:</strong> <span id="billNumber"></span></p>
+</div>
+
             </div>
             <p><strong>Customer:</strong> <span id="cName"></span></p>
             <p><strong>Mobile:</strong> <span id="cMobile"></span></p>
@@ -106,91 +125,239 @@
                     </tr>
                 </tfoot>
             </table>
-            <p>Thank you for your purchase!</p>
-            <button class="print-btn" onclick="window.print()">Print Invoice</button>
+            <p>NO RETURN NO EXCHANGE <br>
+            Thank you for your purchase! <br>
+            Visit Again</P>
+            <button class="print-btn" onclick="printInvoice()">Print Bill</button>
         </div>
     </div>
 
     <script>
         let items = [];
+        const productPrices = {
+            "Crop Top": 250,
+            "Crop Shirt": 250,
+            "Crop T-shirt": 200,
+            "Korean Top": 250,
+            "Turkish Shirt": 300,
+            "Imported Chiffon Top": 250,
+            "Cotton Top": 250,
+            "Cotton Shirt": 250,
+            "Korean Formal Trousers": 250,
+            "Jeans": 400,
+            "Plazo": 200,
+            "One-piece": 500,
+            "Combo 200/-1 3 pieces": 500,
+            "Combo 250/-1 3 pieces": 600,
+            "Combo 300/-1 3 pieces": 700,
+            "Combo 400/-1 3 pieces": 1000
+        };
+        
+        
 
-        function addItem() {
-            let itemName = document.getElementById("itemName").value;
-            let price = parseFloat(document.getElementById("price").value);
-            let quantity = parseInt(document.getElementById("quantity").value);
-
-            if (itemName && price > 0 && quantity > 0) {
-                items.push({ name: itemName, price, quantity });
-                updateItemsTable();
-                document.getElementById("itemName").value = "";
-                document.getElementById("price").value = "";
-                document.getElementById("quantity").value = "";
-            } else {
-                alert("Please enter valid item details!");
+        function populateProductDropdown() {
+            let productSelect = document.getElementById("productSelect");
+            for (let product in productPrices) {
+                let option = document.createElement("option");
+                option.value = product;
+                option.textContent = `${product} - ₹${productPrices[product]}`;
+                productSelect.appendChild(option);
             }
         }
 
-        function removeItem(index) {
-            items.splice(index, 1);
-            updateItemsTable();
+        function updatePrice() {
+            let itemName = document.getElementById("productSelect").value;
+            document.getElementById("price").value = productPrices[itemName];
         }
 
-        function updateItemsTable() {
-            let table = document.getElementById("itemsTable");
-            table.innerHTML = `
-                <tr>
-                    <th>Item</th>
-                    <th>₹</th>
-                    <th>Qty</th>
-                    <th>Action</th>
-                </tr>
-            `;
-            items.forEach((item, index) => {
-                let row = table.insertRow();
-                row.innerHTML = `
-                    <td>${item.name}</td>
-                    <td>₹${item.price}</td>
-                    <td>${item.quantity}</td>
-                    <td><button onclick="removeItem(${index})">Remove</button></td>
-                `;
-            });
-        }
+        function addItem() {
+            let itemName = document.getElementById("productSelect").value;
+            let price = productPrices[itemName];
+            let quantity = parseInt(document.getElementById("quantity").value);
 
-        function generateInvoice() {
-            let customerName = document.getElementById("customerName").value;
-            let customerMobile = document.getElementById("customerMobile").value;
-
-            if (!customerName || !customerMobile || items.length === 0) {
-                alert("Please enter customer details and add at least one item.");
+            if (!itemName || price <= 0 || quantity <= 0) {
+                alert("Please select a valid item and quantity!");
                 return;
             }
 
-            let today = new Date().toLocaleDateString();
-            document.getElementById("invoiceDate").innerText = today;
-            document.getElementById("cName").innerText = customerName;
-            document.getElementById("cMobile").innerText = customerMobile;
+            items.push({ name: itemName, price, quantity });
+            updateItemsTable();
+        }
 
-            let invoiceBody = document.getElementById("invoiceItems");
-            invoiceBody.innerHTML = "";
-            let grandTotal = 0;
+        function removeItem(index) {
+        items.splice(index, 1); // Remove the selected item from the array
+        updateItemsTable(); // Refresh the table
+    }
 
-            items.forEach(item => {
-                let total = item.price * item.quantity;
-                grandTotal += total;
-
-                let row = document.createElement("tr");
-                row.innerHTML = `
+    function updateItemsTable() {
+        let table = document.getElementById("itemsTable");
+        table.innerHTML = `<tr><th>Item</th><th>₹</th><th>Qty</th><th>Action</th></tr>`;
+        items.forEach((item, index) => {
+            table.innerHTML += `
+                <tr>
                     <td>${item.name}</td>
                     <td>₹${item.price}</td>
                     <td>${item.quantity}</td>
-                    <td>₹${total}</td>
-                `;
-                invoiceBody.appendChild(row);
-            });
+                    <td><button onclick="removeItem(${index})">❌</button></td>
+                </tr>
+            `;
+        });
+    }
+        function generateBillNumber() {
+    let billNo = localStorage.getItem("billNumber"); // Get last saved bill number
 
-            document.getElementById("grandTotal").innerText = grandTotal;
+    if (!billNo || isNaN(billNo)) {
+        billNo = 1; // Start from 1 if no bill exists
+    } else {
+        billNo = parseInt(billNo); // Ensure it is a number
+    }
+
+    document.getElementById("billNumber").innerText = billNo; // Display bill number
+}
+
+
+    // Run function when the page loads
+    
+        function generateInvoice() {
             document.getElementById("invoice").style.display = "block";
+            document.getElementById("cName").innerText = document.getElementById("customerName").value;
+            document.getElementById("cMobile").innerText = document.getElementById("customerMobile").value;
+            document.getElementById("invoiceDate").innerText = new Date().toLocaleDateString("en-GB", { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+
+            let total = 0;
+            let invoiceTable = document.getElementById("invoiceItems");
+            invoiceTable.innerHTML = "";
+
+            items.forEach(item => {
+                let row = `<tr><td>${item.name}</td><td>₹${item.price}</td><td>${item.quantity}</td><td>₹${item.price * item.quantity}</td></tr>`;
+                invoiceTable.innerHTML += row;
+                total += item.price * item.quantity;
+            });
+            generateBillNumber();
+
+
+            document.getElementById("grandTotal").innerText = total;
+            
         }
+            function updateBillNumber() {
+    let billNo = localStorage.getItem("billNumber"); // Get last saved bill number
+
+    if (!billNo || isNaN(billNo)) {
+        billNo = 1; // Start from 1 if no bill exists
+    } else {
+        billNo = parseInt(billNo) + 1; // Increment bill number
+    }
+
+    localStorage.setItem("billNumber", billNo); // Save updated bill number
+    document.getElementById("billNumber").innerText = billNo; // Update UI with new bill number
+}
+
+function saveInvoiceAsPDF() {
+    const { jsPDF } = window.jspdf;
+
+    // Capture the invoice div as an image using html2canvas
+    html2canvas(document.getElementById("invoice"), {
+        scale: 2, // Increase scale for better quality
+        logging: true, // Enable logging for debugging
+        useCORS: true, // Enable CORS for external resources
+    }).then((canvas) => {
+        const imgData = canvas.toDataURL("image/png"); // Convert canvas to image data
+        const pdf = new jsPDF({
+            orientation: "portrait",
+            unit: "mm",
+            format: "a4", // Use A6 format for the invoice
+        });
+
+        const imgWidth = pdf.internal.pageSize.getWidth(); // Get PDF page width
+        const imgHeight = (canvas.height * imgWidth) / canvas.width; // Calculate image height to maintain aspect ratio
+
+        const pageHeight = pdf.internal.pageSize.getHeight(); // Get PDF page height
+        let position = 0; // Track the position of the image
+
+        // Add the image to the PDF, splitting it into multiple pages if necessary
+        while (position < imgHeight) {
+            pdf.addImage(imgData, "PNG", 0, -position, imgWidth, imgHeight);
+            position += pageHeight;
+
+            if (position < imgHeight) {
+                pdf.addPage(); // Add a new page if there's more content
+            }
+        }
+
+        // Save the PDF with a filename
+        const billNo = document.getElementById("billNumber").innerText;
+        const pdfFileName = `Invoice_${billNo}.pdf`;
+        pdf.save(pdfFileName);
+
+        // Upload the PDF to Dropbox
+        const pdfBlob = pdf.output("blob");
+        uploadToDropbox(pdfBlob);
+    });
+}
+        window.onload = function () {
+    generateBillNumber();
+};
+
+        
+        function uploadToDropbox(file) 
+        {
+            const accessToken = 'sl.u.AFjh5U-ryukINR12T0XKVFq0cYw8aMTyZwnDIfvzJoAGnG3l5DS3CIIgM23dLq7zxT5azXhtkUiurlpeHF1LN-QLn9XwPRabR4pcU0LTaUy4wxdAIxqY6co80Qw7GL0MqXvBZNrBw72P8Y4Q2PebcMtsIz8GZtBuz8vg7a0sy2hKsA2NVbtoE_TCPDP7jgNKUk6Jzjks6m54XQTHZmkpVZpLYr4TjIdNzvXPHtd-_9DQ5JZazWSu7P5ponJ_OT6wPyODZ7e2cHBUu6IFHuLXrmZS6UFgAQ7dTWqpDfAgHse7yBq7ycel4N33fm6KjU1ltcd3GtlQn1xe_RoMTWLZ25dQOieuOqxOwD2ua1XBJ9agrnN7X1bcVVXP3WcgJmRFFZKG8BoQYk2dYZ286YMbcVS_KVZFuboaN7yDPkwA7yQQhZzUEeSZJhoUUpt0Ztwzhqfl01IGuOcYnEVu3SFClgc6vUzSi5VSqre5MUzZI3zBhejWcoIApTOKMj2-WgB7iIbVAcEYUbr7C7F94768pa59fKz1yA2r0PlyNnbTl7kV3n5ucs2a82qLRgERDLHCzGl5HbNd2EiPJz7uHwoSQC9y5c7LWFaDiHnpaw04JoNj_1sEJgwOxUtriTeyUe_m0ARPNxU2irCa91IxmW9niZY0eu7NHDcj2wi8XdGXS5P9XlgQQR8vvW0-9UFPtobxyzgHoPiga3731m5G_oqUKoywJLdVmQOiYcr1YRW8mXnrD9XILtja7ZZ_op107-fCSOricFz5Qps0xsIpSLhCj06KeYRTVXmw1a2O8zRTxIG_3KPOg0f7jVrFK1LriztCKNe-i0tdGXEVdwRtg3-jbFBSGAxcnvYYjNKRREET8WrrjT_gGxqSzwT4YMYji0ayAaXwhr3KLhevsPosIlr19vJSUKB5RyyJY1qol66RXEP91aRYAEaJw1BoLjt4pgbFWKyiFCEW_MqOrRnpXXM3Nu2yF8-zd-vl9LvBdVLFC3V6sO9ARDcJvAHFWLOy849ryVaZ3iMvL32z0ACwwYV9k0nCzISnQ5d8HvZYCDmMfkr42wlrYeUsULZOtoKuSnRMbXMhoYeiYq3UZ92GUlr1rQcQSfbjzzmlrOJiRF0jdkWLJgTRPaTq7Ad03yZlwwVfET70InQfBmtFj05ipsiuCzNDOwfOKNTr7B6_ap2m_936PbWaHCp3bAL3rPvwzNaUpvS97DeqSJw6QQHQR1n6boHfm3e94Hl8cD5NN8xmMZU7CC386wPbf0GMiHMqPdjH8V_i-ZMbxEQrgt-cqNgHdSy3ogBd4bZdVn7IJxZ279fDYXw3H5FoXTaJTb46NIBCRLTrVdVvP145E8elrjxpyXbhy4RZ8kj9vH4v-54pXmvrs_1VCYUc5qP8wDDYtS42srM3kBLQmhmkX_l8wztdX3m2mreccZ6F_LFI8zGLo2uBNA';
+           const dbx = new Dropbox.Dropbox({ accessToken });
+
+          const billNo = document.getElementById("billNumber").innerText;
+           const filePath = `/Invoices/Invoice_${billNo}.pdf`; // Save in a folder named "Invoices"
+
+            dbx.filesUpload({
+             path: filePath,
+             contents: file,
+             mode: 'overwrite', // Overwrite if the file already exists
+              })
+             .then(function (response) {
+            console.log('File uploaded successfully:', response);
+            shareLink(response.path_display); // Generate a shareable link
+              })
+             .catch(function (error) {
+            console.error('Error uploading file:', error);
+             });
+        }
+
+function shareLink(filePath) {
+    const accessToken = 'sl.u.AFjh5U-ryukINR12T0XKVFq0cYw8aMTyZwnDIfvzJoAGnG3l5DS3CIIgM23dLq7zxT5azXhtkUiurlpeHF1LN-QLn9XwPRabR4pcU0LTaUy4wxdAIxqY6co80Qw7GL0MqXvBZNrBw72P8Y4Q2PebcMtsIz8GZtBuz8vg7a0sy2hKsA2NVbtoE_TCPDP7jgNKUk6Jzjks6m54XQTHZmkpVZpLYr4TjIdNzvXPHtd-_9DQ5JZazWSu7P5ponJ_OT6wPyODZ7e2cHBUu6IFHuLXrmZS6UFgAQ7dTWqpDfAgHse7yBq7ycel4N33fm6KjU1ltcd3GtlQn1xe_RoMTWLZ25dQOieuOqxOwD2ua1XBJ9agrnN7X1bcVVXP3WcgJmRFFZKG8BoQYk2dYZ286YMbcVS_KVZFuboaN7yDPkwA7yQQhZzUEeSZJhoUUpt0Ztwzhqfl01IGuOcYnEVu3SFClgc6vUzSi5VSqre5MUzZI3zBhejWcoIApTOKMj2-WgB7iIbVAcEYUbr7C7F94768pa59fKz1yA2r0PlyNnbTl7kV3n5ucs2a82qLRgERDLHCzGl5HbNd2EiPJz7uHwoSQC9y5c7LWFaDiHnpaw04JoNj_1sEJgwOxUtriTeyUe_m0ARPNxU2irCa91IxmW9niZY0eu7NHDcj2wi8XdGXS5P9XlgQQR8vvW0-9UFPtobxyzgHoPiga3731m5G_oqUKoywJLdVmQOiYcr1YRW8mXnrD9XILtja7ZZ_op107-fCSOricFz5Qps0xsIpSLhCj06KeYRTVXmw1a2O8zRTxIG_3KPOg0f7jVrFK1LriztCKNe-i0tdGXEVdwRtg3-jbFBSGAxcnvYYjNKRREET8WrrjT_gGxqSzwT4YMYji0ayAaXwhr3KLhevsPosIlr19vJSUKB5RyyJY1qol66RXEP91aRYAEaJw1BoLjt4pgbFWKyiFCEW_MqOrRnpXXM3Nu2yF8-zd-vl9LvBdVLFC3V6sO9ARDcJvAHFWLOy849ryVaZ3iMvL32z0ACwwYV9k0nCzISnQ5d8HvZYCDmMfkr42wlrYeUsULZOtoKuSnRMbXMhoYeiYq3UZ92GUlr1rQcQSfbjzzmlrOJiRF0jdkWLJgTRPaTq7Ad03yZlwwVfET70InQfBmtFj05ipsiuCzNDOwfOKNTr7B6_ap2m_936PbWaHCp3bAL3rPvwzNaUpvS97DeqSJw6QQHQR1n6boHfm3e94Hl8cD5NN8xmMZU7CC386wPbf0GMiHMqPdjH8V_i-ZMbxEQrgt-cqNgHdSy3ogBd4bZdVn7IJxZ279fDYXw3H5FoXTaJTb46NIBCRLTrVdVvP145E8elrjxpyXbhy4RZ8kj9vH4v-54pXmvrs_1VCYUc5qP8wDDYtS42srM3kBLQmhmkX_l8wztdX3m2mreccZ6F_LFI8zGLo2uBNA';
+ // Replace with your actual token
+    const dbx = new Dropbox.Dropbox({ accessToken });
+
+    dbx.sharingCreateSharedLinkWithSettings({
+        path: filePath,
+    })
+        .then(function (response) {
+            const fileLink = response.url;
+            console.log('Shareable link:', fileLink);
+
+            // Send the link via WhatsApp
+            const customerMobile = document.getElementById("cMobile").innerText;
+            const message = `Your invoice is ready! Please find it here: ${fileLink}`;
+            const whatsappURL = `https://wa.me/${customerMobile}?text=${encodeURIComponent(message)}`;
+
+            // Open WhatsApp with the message
+            window.open(whatsappURL, '_blank');
+        })
+        .catch(function (error) {
+            console.error('Error generating share link:', error);
+        });
+}
+
+
+        function printInvoice() {
+            updateBillNumber() ;
+            window.print();
+            
+            saveInvoiceAsPDF();
+            
+            
+        }
+
+        document.addEventListener("DOMContentLoaded", populateProductDropdown);
     </script>
 
 </body>
